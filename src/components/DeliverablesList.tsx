@@ -142,15 +142,27 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
 
           {/* Content */}
           <div className="flex-1 min-w-0">
-            {/* Title */}
+            {/* Title - clickable for URLs */}
             <div className="flex items-start justify-between gap-2">
-              <h4 className="font-medium text-mc-text">{deliverable.title}</h4>
+              {deliverable.deliverable_type === 'url' && deliverable.path ? (
+                <a
+                  href={deliverable.path}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-mc-accent hover:text-mc-accent/80 hover:underline flex items-center gap-1.5"
+                >
+                  {deliverable.title}
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              ) : (
+                <h4 className="font-medium text-mc-text">{deliverable.title}</h4>
+              )}
               <div className="flex items-center gap-1">
                 {/* Preview button for HTML files */}
                 {deliverable.deliverable_type === 'file' && deliverable.path?.endsWith('.html') && (
                   <button
                     onClick={() => handlePreview(deliverable)}
-                    className="flex-shrink-0 p-1 hover:bg-mc-bg-tertiary rounded text-mc-accent-cyan"
+                    className="flex-shrink-0 p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-accent-cyan"
                     title="Preview in browser"
                   >
                     <Eye className="w-4 h-4" />
@@ -160,7 +172,7 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
                 {deliverable.path && (
                   <button
                     onClick={() => handleOpen(deliverable)}
-                    className="flex-shrink-0 p-1 hover:bg-mc-bg-tertiary rounded text-mc-accent"
+                    className="flex-shrink-0 p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-accent"
                     title={deliverable.deliverable_type === 'url' ? 'Open URL' : 'Reveal in Finder'}
                   >
                     <ExternalLink className="w-4 h-4" />
@@ -176,11 +188,22 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
               </p>
             )}
 
-            {/* Path */}
+            {/* Path - clickable for URLs */}
             {deliverable.path && (
-              <div className="mt-2 p-2 bg-mc-bg-tertiary rounded text-xs text-mc-text-secondary font-mono break-all">
-                {deliverable.path}
-              </div>
+              deliverable.deliverable_type === 'url' ? (
+                <a
+                  href={deliverable.path}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 p-2 bg-mc-bg-tertiary rounded text-xs text-mc-accent hover:text-mc-accent/80 font-mono break-all block hover:bg-mc-bg-tertiary/80"
+                >
+                  {deliverable.path}
+                </a>
+              ) : (
+                <div className="mt-2 p-2 bg-mc-bg-tertiary rounded text-xs text-mc-text-secondary font-mono break-all">
+                  {deliverable.path}
+                </div>
+              )
             )}
 
             {/* Metadata */}
