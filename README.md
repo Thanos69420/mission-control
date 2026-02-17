@@ -364,6 +364,18 @@ Mission Control is built by a growing community. Thank you to everyone who has c
 
 ---
 
+## ⭐ Star History
+
+<a href="https://www.star-history.com/#crshdn/mission-control&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=crshdn/mission-control&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=crshdn/mission-control&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=crshdn/mission-control&type=Date" width="600" />
+  </picture>
+</a>
+
+---
+
 ## 📜 License
 
 MIT License — see [LICENSE](LICENSE) for details.
