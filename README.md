@@ -516,13 +516,7 @@ Mission Control is built by a growing community. Thank you to everyone who has c
 
 ## ⭐ Star History
 
-<a href="https://www.star-history.com/#Ax1omAI/mission-control&Date">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Ax1omAI/mission-control&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Ax1omAI/mission-control&type=Date" />
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=Ax1omAI/mission-control&type=Date" width="600" />
-  </picture>
-</a>
+[![Star History Chart](https://api.star-history.com/svg?repos=Ax1omAI/mission-control&type=Date)](https://www.star-history.com/#Ax1omAI/mission-control&Date)
 
 ---
 
