@@ -24,6 +24,7 @@ export function TaskModal({ task, onClose, workspaceId }: TaskModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSendingFollowUp, setIsSendingFollowUp] = useState(false);
   const [followUpQuestion, setFollowUpQuestion] = useState('');
+  const [followUpNotice, setFollowUpNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [showAgentModal, setShowAgentModal] = useState(false);
   const [usePlanningMode, setUsePlanningMode] = useState(false);
   // Auto-switch to planning tab if task is in planning status
@@ -157,8 +158,9 @@ export function TaskModal({ task, onClose, workspaceId }: TaskModalProps) {
 
     const question = followUpQuestion.trim();
     if (!question) return;
+    setFollowUpNotice(null);
     if (!task.assigned_agent_id) {
-      alert('Assign an agent to this task before sending a follow-up.');
+      setFollowUpNotice({ type: 'error', message: 'Assign an agent to this task before sending a follow-up.' });
       return;
     }
 
@@ -205,10 +207,14 @@ export function TaskModal({ task, onClose, workspaceId }: TaskModalProps) {
       }
 
       setFollowUpQuestion('');
+      setFollowUpNotice({ type: 'success', message: 'Follow-up dispatched. Switched to Activity tab.' });
       setActiveTab('activity');
     } catch (error) {
       console.error('Failed to send follow-up:', error);
-      alert(error instanceof Error ? error.message : 'Failed to send follow-up');
+      setFollowUpNotice({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Failed to send follow-up',
+      });
     } finally {
       setIsSendingFollowUp(false);
     }
@@ -314,6 +320,17 @@ export function TaskModal({ task, onClose, workspaceId }: TaskModalProps) {
                 className="w-full bg-mc-bg-secondary border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
                 placeholder="Ask a specific follow-up question about existing deliverables..."
               />
+              {followUpNotice && (
+                <div
+                  className={`text-xs rounded px-2 py-1 border ${
+                    followUpNotice.type === 'success'
+                      ? 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10'
+                      : 'text-rose-300 border-rose-500/40 bg-rose-500/10'
+                  }`}
+                >
+                  {followUpNotice.message}
+                </div>
+              )}
               <div className="flex justify-end">
                 <button
                   type="button"
