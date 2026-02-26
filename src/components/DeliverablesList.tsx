@@ -129,7 +129,13 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
   };
 
   const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp);
+    // SQLite often stores timestamps without timezone info.
+    // Treat bare DB timestamps as UTC to avoid local-time misinterpretation.
+    const normalized = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}$/.test(timestamp)
+      ? `${timestamp.replace(' ', 'T')}Z`
+      : timestamp;
+
+    const date = new Date(normalized);
     return date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
