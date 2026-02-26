@@ -22,6 +22,8 @@ interface TaskModalProps {
 export function TaskModal({ task, onClose, workspaceId }: TaskModalProps) {
   const { agents, addTask, updateTask, addEvent } = useMissionControl();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSendingFollowUp, setIsSendingFollowUp] = useState(false);
+  const [followUpQuestion, setFollowUpQuestion] = useState('');
   const [showAgentModal, setShowAgentModal] = useState(false);
   const [usePlanningMode, setUsePlanningMode] = useState(false);
   // Auto-switch to planning tab if task is in planning status
@@ -150,6 +152,68 @@ export function TaskModal({ task, onClose, workspaceId }: TaskModalProps) {
     }
   };
 
+  const handleFollowUp = async () => {
+    if (!task) return;
+
+    const question = followUpQuestion.trim();
+    if (!question) return;
+    if (!task.assigned_agent_id) {
+      alert('Assign an agent to this task before sending a follow-up.');
+      return;
+    }
+
+    setIsSendingFollowUp(true);
+
+    try {
+      // Move back into active workflow so queue reflects redispatch intent
+      await fetch(`/api/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'assigned' }),
+      });
+
+      const activityRes = await fetch(`/api/tasks/${task.id}/activities`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          activity_type: 'updated',
+          agent_id: task.assigned_agent_id,
+          message: `Review follow-up requested: ${question}`,
+          metadata: JSON.stringify({ type: 'review_followup', question }),
+        }),
+      });
+
+      if (!activityRes.ok) {
+        console.error('Failed to log follow-up activity');
+      }
+
+      const dispatchRes = await fetch(`/api/tasks/${task.id}/dispatch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ follow_up_question: question }),
+      });
+
+      if (!dispatchRes.ok) {
+        const data = await dispatchRes.json().catch(() => ({}));
+        throw new Error(data.error || data.message || 'Failed to dispatch follow-up');
+      }
+
+      const refreshed = await fetch(`/api/tasks/${task.id}`);
+      if (refreshed.ok) {
+        const updatedTask = await refreshed.json();
+        updateTask(updatedTask);
+      }
+
+      setFollowUpQuestion('');
+      setActiveTab('activity');
+    } catch (error) {
+      console.error('Failed to send follow-up:', error);
+      alert(error instanceof Error ? error.message : 'Failed to send follow-up');
+    } finally {
+      setIsSendingFollowUp(false);
+    }
+  };
+
   const statuses: TaskStatus[] = ['planning', 'inbox', 'assigned', 'in_progress', 'testing', 'review', 'done'];
   const priorities: TaskPriority[] = ['low', 'normal', 'high', 'urgent'];
 
@@ -238,6 +302,30 @@ export function TaskModal({ task, onClose, workspaceId }: TaskModalProps) {
               placeholder="Add details..."
             />
           </div>
+
+          {/* Review follow-up */}
+          {task && (task.status === 'review' || task.status === 'done') && (
+            <div className="p-3 bg-mc-bg rounded-lg border border-mc-border space-y-2">
+              <label className="block text-sm font-medium">Ask follow-up on this task</label>
+              <textarea
+                value={followUpQuestion}
+                onChange={(e) => setFollowUpQuestion(e.target.value)}
+                rows={3}
+                className="w-full bg-mc-bg-secondary border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
+                placeholder="Ask a specific follow-up question about existing deliverables..."
+              />
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleFollowUp}
+                  disabled={isSendingFollowUp || !followUpQuestion.trim()}
+                  className="px-3 py-2 bg-mc-accent text-mc-bg rounded text-sm font-medium hover:bg-mc-accent/90 disabled:opacity-50"
+                >
+                  {isSendingFollowUp ? 'Dispatching…' : 'Send Follow-up'}
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Planning Mode Toggle - only for new tasks */}
           {!task && (

@@ -21,6 +21,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const { id } = await params;
     const now = new Date().toISOString();
 
+    let followUpQuestion: string | undefined;
+    try {
+      const body = await request.json();
+      if (body?.follow_up_question && typeof body.follow_up_question === 'string') {
+        followUpQuestion = body.follow_up_question.trim();
+      }
+    } catch {
+      // No JSON body provided; standard dispatch flow
+    }
+
     // Get task with agent info
     const task = queryOne<Task & { assigned_agent_name?: string; workspace_id: string }>(
       `SELECT t.*, a.name as assigned_agent_name, a.is_master
@@ -168,7 +178,34 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const taskProjectDir = `${projectsPath}/${projectDir}`;
     const missionControlUrl = getMissionControlUrl();
 
-    const taskMessage = `${priorityEmoji} **NEW TASK ASSIGNED**
+    const taskMessage = followUpQuestion
+      ? `${priorityEmoji} **FOLLOW-UP REQUEST ON EXISTING TASK**
+
+**Title:** ${task.title}
+${task.description ? `**Current Task Context:** ${task.description}\n` : ''}
+**Follow-up Question:** ${followUpQuestion}
+**Priority:** ${task.priority.toUpperCase()}
+${task.due_date ? `**Due:** ${task.due_date}\n` : ''}
+**Task ID:** ${task.id}
+
+Please review prior work and deliverables for this task, then produce an updated/addendum deliverable that directly answers the follow-up question.
+
+**OUTPUT DIRECTORY:** ${taskProjectDir}
+Create this directory and save all deliverables there.
+
+**IMPORTANT:** After completing work, you MUST call these APIs:
+1. Log activity: POST ${missionControlUrl}/api/tasks/${task.id}/activities
+   Body: {"activity_type": "completed", "message": "Description of what was done"}
+2. Register deliverable: POST ${missionControlUrl}/api/tasks/${task.id}/deliverables
+   Body: {"deliverable_type": "file", "title": "File name", "path": "${taskProjectDir}/filename.html"}
+3. Update status: PATCH ${missionControlUrl}/api/tasks/${task.id}
+   Body: {"status": "review"}
+
+When complete, reply with:
+\`TASK_COMPLETE: [brief summary of what you did]\`
+
+If you need help or clarification, ask the orchestrator.`
+      : `${priorityEmoji} **NEW TASK ASSIGNED**
 
 **Title:** ${task.title}
 ${task.description ? `**Description:** ${task.description}\n` : ''}
@@ -237,7 +274,16 @@ If you need help or clarification, ask the orchestrator.`;
       run(
         `INSERT INTO task_activities (id, task_id, agent_id, activity_type, message, created_at)
          VALUES (?, ?, ?, ?, ?, ?)`,
-        [activityId, task.id, agent.id, 'status_changed', `Task dispatched to ${agent.name} - Agent is now working on this task`, now]
+        [
+          activityId,
+          task.id,
+          agent.id,
+          'status_changed',
+          followUpQuestion
+            ? `Follow-up dispatched to ${agent.name}: ${followUpQuestion}`
+            : `Task dispatched to ${agent.name} - Agent is now working on this task`,
+          now,
+        ]
       );
 
       return NextResponse.json({
