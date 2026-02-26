@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { queryAll, queryOne, run } from '@/lib/db';
 import type { Agent, CreateAgentRequest } from '@/lib/types';
+import { getCoreTeamNames, isCoreTeamLockEnabled } from '@/lib/config';
 
 // GET /api/agents - List all agents
 export async function GET(request: NextRequest) {
@@ -18,6 +19,12 @@ export async function GET(request: NextRequest) {
         SELECT * FROM agents ORDER BY is_master DESC, name ASC
       `);
     }
+
+    if (isCoreTeamLockEnabled()) {
+      const coreNames = new Set(getCoreTeamNames().map((n) => n.toLowerCase()));
+      agents = agents.filter((a) => coreNames.has(a.name.toLowerCase()));
+    }
+
     return NextResponse.json(agents);
   } catch (error) {
     console.error('Failed to fetch agents:', error);

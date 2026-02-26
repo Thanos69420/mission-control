@@ -3,6 +3,7 @@ import { queryOne, run, getDb, queryAll } from '@/lib/db';
 import { getOpenClawClient } from '@/lib/openclaw/client';
 import { broadcast } from '@/lib/events';
 import { extractJSON, getMessagesFromOpenClaw } from '@/lib/planning-utils';
+import { getCoreTeamNames, isCoreTeamLockEnabled } from '@/lib/config';
 import { Task } from '@/lib/types';
 
 // Planning timeout and poll interval configuration with validation
@@ -23,6 +24,9 @@ async function handlePlanningCompletion(taskId: string, parsed: any, messages: a
   let dispatchError: string | null = null;
   let firstAgentId: string | null = null;
 
+  const coreTeamLock = isCoreTeamLockEnabled();
+  const coreTeamNames = getCoreTeamNames();
+
   // Wrap all database operations in a transaction for atomicity
   // Set status to 'pending_dispatch' first - don't mark as complete until dispatch succeeds
   const transaction = db.transaction(() => {
@@ -42,7 +46,42 @@ async function handlePlanningCompletion(taskId: string, parsed: any, messages: a
       taskId
     );
 
-    // Create the agents in the workspace and track first agent for auto-assign
+    // Core Team Lock: do not persist auto-generated helper agents.
+    // Instead, assign to an existing core team agent.
+    if (coreTeamLock) {
+      const workspace = db.prepare('SELECT workspace_id FROM tasks WHERE id = ?').get(taskId) as { workspace_id: string } | undefined;
+      if (!workspace) return null;
+
+      const existingAgents = db.prepare('SELECT id, name FROM agents WHERE workspace_id = ? AND status != ?').all(
+        workspace.workspace_id,
+        'offline'
+      ) as Array<{ id: string; name: string }>;
+
+      const byName = new Map(existingAgents.map((a) => [a.name.toLowerCase(), a.id]));
+
+      // Prefer planner-suggested core name, then Beacon, then first core in configured order.
+      const suggestedCoreName = (parsed.agents || [])
+        .map((a: any) => (a?.name || '').trim())
+        .find((name: string) => coreTeamNames.some((core) => core.toLowerCase() === name.toLowerCase()));
+
+      const preferredNames = [
+        ...(suggestedCoreName ? [suggestedCoreName] : []),
+        'Beacon',
+        ...coreTeamNames,
+      ];
+
+      for (const name of preferredNames) {
+        const match = byName.get(name.toLowerCase());
+        if (match) {
+          firstAgentId = match;
+          break;
+        }
+      }
+
+      return firstAgentId;
+    }
+
+    // Default behavior: create planner-proposed agents and track first for auto-assign
     if (parsed.agents && parsed.agents.length > 0) {
       const insertAgent = db.prepare(`
         INSERT INTO agents (id, workspace_id, name, role, description, avatar_emoji, status, soul_md, created_at, updated_at)
@@ -70,6 +109,10 @@ async function handlePlanningCompletion(taskId: string, parsed: any, messages: a
 
   // Execute the transaction to create agents and set pending_dispatch status
   firstAgentId = transaction();
+
+  if (coreTeamLock && !firstAgentId) {
+    dispatchError = `Core Team Lock enabled but no eligible core agent found. Configure CORE_TEAM_AGENT_NAMES or create those agents in this workspace.`;
+  }
 
   // Re-check for other orchestrators before dispatching (prevents race condition)
   if (firstAgentId) {

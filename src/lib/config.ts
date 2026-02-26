@@ -127,6 +127,23 @@ export function getMissionControlUrl(): string {
 }
 
 /**
+ * Core Team Lock
+ * When enabled, Mission Control only surfaces/uses core team agents
+ * and avoids persisting auto-generated helper agents.
+ */
+export function isCoreTeamLockEnabled(): boolean {
+  return (process.env.CORE_TEAM_LOCK || '').toLowerCase() === 'true';
+}
+
+export function getCoreTeamNames(): string[] {
+  const raw = process.env.CORE_TEAM_AGENT_NAMES || 'Axiom,Anvil,Beacon,Forge';
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/**
  * Get workspace base path
  * Server-side only - returns configured path or default
  */
