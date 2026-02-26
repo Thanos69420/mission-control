@@ -6,7 +6,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { FileText, Link as LinkIcon, Package, ExternalLink, Eye, FolderSearch, X } from 'lucide-react';
+import { FileText, Link as LinkIcon, Package, ExternalLink, Eye, FolderSearch, X, FileDown } from 'lucide-react';
 import { debug } from '@/lib/debug';
 import type { TaskDeliverable } from '@/lib/types';
 
@@ -19,6 +19,7 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
   const [loading, setLoading] = useState(true);
   const [previewPath, setPreviewPath] = useState<string | null>(null);
   const [previewTitle, setPreviewTitle] = useState<string>('');
+  const [generatingPdfId, setGeneratingPdfId] = useState<string | null>(null);
 
   const loadDeliverables = useCallback(async () => {
     try {
@@ -106,6 +107,26 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
     }
   };
 
+  const handleGeneratePdf = async (deliverable: TaskDeliverable) => {
+    setGeneratingPdfId(deliverable.id);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/deliverables/${deliverable.id}/pdf`, {
+        method: 'POST',
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to generate PDF');
+      }
+
+      await loadDeliverables();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to generate PDF');
+    } finally {
+      setGeneratingPdfId(null);
+    }
+  };
+
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
     return date.toLocaleDateString('en-US', {
@@ -164,15 +185,25 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
                   <h4 className="font-medium text-mc-text">{deliverable.title}</h4>
                 )}
                 <div className="flex items-center gap-1">
-                  {/* Preview button for HTML files */}
+                  {/* Preview + PDF buttons for HTML files */}
                   {deliverable.deliverable_type === 'file' && /\.html?$/i.test(deliverable.path || '') && (
-                    <button
-                      onClick={() => handlePreview(deliverable)}
-                      className="flex-shrink-0 p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-accent-cyan"
-                      title="Preview inline"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
+                    <>
+                      <button
+                        onClick={() => handlePreview(deliverable)}
+                        className="flex-shrink-0 p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-accent-cyan"
+                        title="Preview inline"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleGeneratePdf(deliverable)}
+                        disabled={generatingPdfId === deliverable.id}
+                        className="flex-shrink-0 p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-accent-yellow disabled:opacity-50"
+                        title="Generate PDF"
+                      >
+                        <FileDown className="w-4 h-4" />
+                      </button>
+                    </>
                   )}
                   {/* Open button */}
                   {deliverable.path && (
