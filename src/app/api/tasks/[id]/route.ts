@@ -151,6 +151,39 @@ export async function PATCH(
 
     run(`UPDATE tasks SET ${updates.join(', ')} WHERE id = ?`, values);
 
+    // If task was moved to done, release assigned agent back to standby
+    // only when they have no other active tasks.
+    if (validatedData.status === 'done' && existing.assigned_agent_id) {
+      const activeTaskCount = queryOne<{ count: number }>(
+        `SELECT COUNT(*) as count
+         FROM tasks
+         WHERE assigned_agent_id = ?
+           AND id != ?
+           AND status IN ('assigned', 'in_progress', 'testing', 'review')`,
+        [existing.assigned_agent_id, id]
+      )?.count || 0;
+
+      if (activeTaskCount === 0) {
+        run(
+          `UPDATE agents SET status = ?, updated_at = ? WHERE id = ?`,
+          ['standby', now, existing.assigned_agent_id]
+        );
+
+        run(
+          `INSERT INTO events (id, type, agent_id, task_id, message, created_at)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [
+            uuidv4(),
+            'status_changed',
+            existing.assigned_agent_id,
+            id,
+            'Agent set to standby after task moved to done',
+            now,
+          ]
+        );
+      }
+    }
+
     // Fetch updated task with all joined fields
     const task = queryOne<Task>(
       `SELECT t.*,
