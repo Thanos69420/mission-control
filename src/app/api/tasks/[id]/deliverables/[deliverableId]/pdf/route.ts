@@ -18,10 +18,10 @@ function getAllowedRoots(): string[] {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string; deliverableId: string } }
+  { params }: { params: Promise<{ id: string; deliverableId: string }> }
 ) {
   const db = getDb();
-  const { id: taskId, deliverableId } = params;
+  const { id: taskId, deliverableId } = await params;
 
   const deliverable = db.prepare(`
     SELECT * FROM task_deliverables
